@@ -136,6 +136,14 @@ jobs:
 
          echo "=== FINAL LTO CONFIGS ==="
          grep -E '^CONFIG_LTO(_|$)' out/.config || echo "No LTO configs found!"
+       
+      - name: Fail if LTO config is broken
+        run: |
+          cd "${{ env.CONFIG }}"
+          echo "Validating .config..."
+          grep -q '^CONFIG_LTO_GCC=y' out/.config || { echo "❌ CONFIG_LTO_GCC=y not set!"; exit 1; }
+          grep -q '^CONFIG_LTO_NONE=y' out/.config && { echo "❌ CONFIG_LTO_NONE=y is still set!"; exit 1; }
+          echo "✅ LTO configuration is correct."
 
 
       - name: Debug:Confirm LTO Options in .config
