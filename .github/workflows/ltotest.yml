@@ -116,18 +116,18 @@ jobs:
          cd "${{ env.CONFIG }}"
          DEFCONFIG=${{ inputs.codename }}_defconfig
 
-         # ✅ Remove LTO_NONE early from the base defconfig
+         # 🛠 Remove CONFIG_LTO_NONE from the defconfig itself before any make
+         echo "Patching $DEFCONFIG to remove CONFIG_LTO_NONE"
          sed -i '/CONFIG_LTO_NONE/d' arch/arm64/configs/$DEFCONFIG
 
+         # Proceed with defconfig generation
          make O=out ARCH=arm64 $DEFCONFIG
          make O=out ARCH=arm64 olddefconfig
 
          cp out/.config out/.config.before_lto
 
-         # ✅ Disable LTO_NONE in final config
+         # Use scripts/config to finalize LTO setup
          scripts/config --file out/.config -d LTO_NONE
-
-         # ✅ Enable proper LTO flags
          scripts/config --file out/.config -e LTO
          scripts/config --file out/.config -e LTO_GCC
          scripts/config --file out/.config -e THIN_LTO
@@ -136,6 +136,7 @@ jobs:
 
          echo "=== FINAL LTO CONFIGS ==="
          grep -E '^CONFIG_LTO(_|$)' out/.config || echo "No LTO configs found!"
+
 
        
       - name: Fail if LTO config is broken
