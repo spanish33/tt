@@ -30,52 +30,58 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
 
-      - name: Install toolchain and dependencies
+      - name: Install LLVM and build tools
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential \
-            bc \
-            bison \
-            flex \
-            libssl-dev \
-            libncurses5-dev \
-            git \
-            curl \
-            python3 \
-            zlib1g-dev \
-            libelf-dev \
-            ccache \
-            wget \
-            gcc-11 \
-            g++-11 \
-            gcc-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu \
-            zip
+            clang llvm lld bc make curl git libssl-dev \
+            flex bison libelf-dev libncurses-dev \
+            gcc-aarch64-linux-gnu ccache build-essential
 
       - name: Set environment variables
         run: |
-          echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
-          echo "ARCH=arm64" >> $GITHUB_ENV
-          echo "CC=gcc-11" >> $GITHUB_ENV
-          echo "LD=ld.gold" >> $GITHUB_ENV
-          echo "AR=aarch64-linux-gnu-ar" >> $GITHUB_ENV
-          echo "NM=aarch64-linux-gnu-nm" >> $GITHUB_ENV
-          echo "OBJCOPY=aarch64-linux-gnu-objcopy" >> $GITHUB_ENV
-          echo "OBJDUMP=aarch64-linux-gnu-objdump" >> $GITHUB_ENV
-          echo "STRIP=aarch64-linux-gnu-strip" >> $GITHUB_ENV
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "LD=ld.lld" >> $GITHUB_ENV
+          echo "AR=llvm-ar" >> $GITHUB_ENV
+          echo "NM=llvm-nm" >> $GITHUB_ENV
+          echo "OBJCOPY=llvm-objcopy" >> $GITHUB_ENV
+          echo "OBJDUMP=llvm-objdump" >> $GITHUB_ENV
+          echo "STRIP=llvm-strip" >> $GITHUB_ENV
+          echo "LLVM=1" >> $GITHUB_ENV
+          echo "LLVM_IAS=1" >> $GITHUB_ENV
           echo "CONFIG=${{ inputs.repo }}" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Kernel Source
         run: |
           git clone --depth=1 https://github.com/spanish33/AnyKernel3.git -b 15.0.0-sultan-zuma
           git clone --depth=1 https://github.com/spanish33/${{ inputs.repo }} -b sultan-susfs
+ 
+      - name: Fix format-security warnings in LWIS sources
+        run: |
+          cd "${{ env.CONFIG }}"
 
+          echo "Patching lwis_util.c to fix kthread_run format-security warning..."
+          sed -i 's/kthread_run(kthread_worker_fn, &lwis_dev->transaction_worker, t_name);/kthread_run(kthread_worker_fn, \&lwis_dev->transaction_worker, "%s", t_name);/' google-modules/lwis/lwis_util.c
 
+          echo "Patching lwis_bus_manager.c to fix kthread_run format-security warning..."
+          sed -i 's/kthread_run(kthread_worker_fn, &bus_manager->bus_worker, bus_thread_name);/kthread_run(kthread_worker_fn, \&bus_manager->bus_worker, "%s", bus_thread_name);/' google-modules/lwis/lwis_bus_manager.c
+
+      - name: Suppress unused warning for cur_framelen
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/uint32 cur_framelen;/a\        (void)cur_framelen;' google-modules/wlan/bcm4398/dhd_ip.c
+		 
+      - name: Suppress unused warning for free_cnt
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/uint32 count, free_cnt = 0U, wordix, idmap_ix, bitix, \*bitmap_p;/a\        (void)free_cnt;' google-modules/wlan/bcm4398/bcmutils.c
+
+         
       - name: Add KernelSU
         run: |
           cd "${{ env.CONFIG }}"
           curl -LSs "https://raw.githubusercontent.com/spanish33/kernelsu/main/kernel/setup.sh" | bash -
+      
 
       - name: Apply SUSFS and Kernel Config Patches
         run: |
@@ -103,15 +109,7 @@ jobs:
           echo "CONFIG_TMPFS_XATTR=y" >> $DEFCONFIG
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> $DEFCONFIG
 
-
-       
-      - name: Configure Kernel and Enable GCC LTO
-        run: |
-         set -e
-         cd "${{ env.CONFIG }}"
-         DEFCONFIG=${{ inputs.codename }}_defconfig
-
-      - name: Configure Kernel and Enable GCC LTO
+      - name: Configure Kernel and Enable LTO
         run: |
           set -e
           cd "${{ env.CONFIG }}"
@@ -121,20 +119,16 @@ jobs:
           make O=out ARCH=arm64 olddefconfig
 
           cp out/.config out/.config.before_lto
-          
-          scripts/config --file out/.config -d LTO_NONE
-          scripts/config --file out/.config -e LTO
-          scripts/config --file out/.config -e LTO_GCC
-          scripts/config --file out/.config -e THIN_LTO
+
+          scripts/config --file out/.config --disable LTO_GCC
+          scripts/config --file out/.config --disable LTO_CLANG_FULL
+          scripts/config --file out/.config --disable LTO_NONE
+          scripts/config --file out/.config --enable LTO
+          scripts/config --file out/.config --enable LTO_CLANG
+          scripts/config --file out/.config --enable LTO_CLANG_THIN
+          scripts/config --file out/.config --enable LD_LLD
+
           make O=out ARCH=arm64 olddefconfig
-
-      - name: Debug:Confirm LTO Options in .config
-        run: |
-         cd "${{ env.CONFIG }}"
-         grep -E '^CONFIG_LTO|^CONFIG_LTO_GCC|^CONFIG_THIN_LTO' out/.config || echo "LTO options not found!"
-
-
-       
       - name: Fail if LTO config is broken
         run: |
           cd "${{ env.CONFIG }}"
@@ -143,35 +137,16 @@ jobs:
           grep -q '^CONFIG_LTO_NONE=y' out/.config && { echo "❌ CONFIG_LTO_NONE=y is still set!"; exit 1; }
           echo "✅ LTO configuration is correct."
 
-
-      - name: Debug:Confirm LTO Options in .config
-        run: |
-         cd "${{ env.CONFIG }}"
-         grep -E '^CONFIG_LTO|^CONFIG_LTO_GCC|^CONFIG_THIN_LTO' out/.config || echo "LTO options not found!"
-
-      - name: Debug:Show CC_FLAGS_LTO Makefile Section
-        run: |
-         cd "${{ env.CONFIG }}"
-         echo "Dumping Makefile LTO section:"
-         awk '/CC_FLAGS_LTO/ {print NR, $0}' Makefile
-         grep -A4 'export CC_FLAGS_LTO' Makefile
-
-
       - name: Debug Config Differences
         run: |
           cd "${{ env.CONFIG }}"
           diff -u out/.config.before_lto out/.config || echo "No config differences detected."
 
-      - name: Debug Kernel Build Flags Before Build
+      - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
-          # Print the flags being passed to the compiler
-          make O=out ARCH=arm64 -n | grep "gcc"
-          
-      - name: Build the Kernel
-        run: |
-          cd "${{ env.CONFIG }}"
-          make O=out -j$(nproc --all)
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-Wno-c23-extensions -Wno-format-security" -j$(nproc)
+          ccache --show-stats
 
       - name: Copy Images
         run: |
