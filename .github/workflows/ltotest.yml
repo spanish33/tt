@@ -125,7 +125,12 @@ jobs:
           scripts/config --file out/.config -e LTO
           scripts/config --file out/.config -e LTO_GCC
           scripts/config --file out/.config -e THIN_LTO
+
+          # ⚠️ Critical: Regenerate .config after modifications
           make O=out ARCH=arm64 olddefconfig
+
+          echo "=== FINAL LTO CONFIGS ==="
+          grep -E 'CONFIG_LTO(_|$)' out/.config || echo "No LTO configs found!"
 
       - name: Debug:Confirm LTO Options in .config
         run: |
