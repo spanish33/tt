@@ -112,25 +112,31 @@ jobs:
          
       - name: Configure Kernel and Enable GCC LTO
         run: |
-          set -e
-          cd "${{ env.CONFIG }}"
-          DEFCONFIG=${{ inputs.codename }}_defconfig
+         set -e
+         cd "${{ env.CONFIG }}"
+         DEFCONFIG=arch/arm64/configs/${{ inputs.codename }}_defconfig
 
-          make O=out ARCH=arm64 $DEFCONFIG
-          make O=out ARCH=arm64 olddefconfig
+         # 🔁 Edit defconfig directly to ensure LTO_NONE is not defined
+         sed -i '/CONFIG_LTO_NONE/d' "$DEFCONFIG"
 
-          cp out/.config out/.config.before_lto
-          
-          scripts/config --file out/.config -d LTO_NONE
-          scripts/config --file out/.config -e LTO
-          scripts/config --file out/.config -e LTO_GCC
-          scripts/config --file out/.config -e THIN_LTO
+         # Now generate config
+         make O=out ARCH=arm64 $DEFCONFIG
+         make O=out ARCH=arm64 olddefconfig
 
-          # ⚠️ Critical: Regenerate .config after modifications
-          make O=out ARCH=arm64 olddefconfig
+         cp out/.config out/.config.before_lto
 
-          echo "=== FINAL LTO CONFIGS ==="
-          grep -E 'CONFIG_LTO(_|$)' out/.config || echo "No LTO configs found!"
+         # 🔧 Disable LTO_NONE explicitly again to be safe
+         scripts/config --file out/.config -d LTO_NONE
+         scripts/config --file out/.config -e LTO
+         scripts/config --file out/.config -e LTO_GCC
+         scripts/config --file out/.config -e THIN_LTO
+
+         # 🔁 Regenerate .config after editing it
+         make O=out ARCH=arm64 olddefconfig
+
+         echo "=== FINAL LTO CONFIGS ==="
+         grep -E '^CONFIG_LTO(_|$)' out/.config || echo "No LTO configs found!"
+
 
       - name: Debug:Confirm LTO Options in .config
         run: |
