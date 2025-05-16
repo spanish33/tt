@@ -104,27 +104,12 @@ jobs:
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> $DEFCONFIG
 
 
-      - name: Show modified Makefile section
-        run: |
-         cd "${{ env.CONFIG }}"
-         grep -A5 'export CC_FLAGS_LTO' Makefile
-
-         
+       
       - name: Configure Kernel and Enable GCC LTO
         run: |
          set -e
          cd "${{ env.CONFIG }}"
          DEFCONFIG=${{ inputs.codename }}_defconfig
-
-         # 🛠 Remove CONFIG_LTO_NONE from the defconfig itself before any make
-         echo "Patching $DEFCONFIG to remove CONFIG_LTO_NONE"
-         sed -i '/CONFIG_LTO_NONE/d' arch/arm64/configs/$DEFCONFIG
-
-         # Proceed with defconfig generation
-         make O=out ARCH=arm64 $DEFCONFIG
-         make O=out ARCH=arm64 olddefconfig
-
-         cp out/.config out/.config.before_lto
 
          # Use scripts/config to finalize LTO setup
          scripts/config --file out/.config -d LTO_NONE
