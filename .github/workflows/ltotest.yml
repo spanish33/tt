@@ -1,4 +1,4 @@
-name: sultan
+name: ltotest
 
 permissions:
   contents: write  
@@ -15,7 +15,7 @@ on:
         type: string
 
 jobs:
-  build-kernel-sultan-kernelsu-susfs:
+  ltotest:
     runs-on: ubuntu-latest
 
     steps:
@@ -115,7 +115,7 @@ jobs:
       - name: Create Flashable ZIP
         run: |
           cd AnyKernel3
-          ZIP_NAME="${{ inputs.codename }}_A15_Sultan_SUSFS_ThinLTO.zip"
+          ZIP_NAME="${{ inputs.codename }}_Test_ThinLTO.zip"
           zip -r "../$ZIP_NAME" ./*
 
       - name: Upload Build Artifacts
