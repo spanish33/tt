@@ -30,28 +30,53 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
 
-      - name: Installing dependencies
+      - name: Install toolchain and dependencies
         run: |
           sudo apt update
-          sudo apt install -y gcc-aarch64-linux-gnu bc bison flex libssl-dev \
-            libncurses5-dev git curl python3 zlib1g-dev libelf-dev ccache wget zip
+          sudo apt install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses5-dev \
+            git \
+            curl \
+            python3 \
+            zlib1g-dev \
+            libelf-dev \
+            ccache \
+            wget \
+            gcc-11 \
+            g++-11 \
+            gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            zip
 
-      - name: Set CONFIG Environment Variable
+      - name: Set environment variables
         run: |
-          CONFIG="${{ inputs.repo }}"
-          echo "CONFIG=$CONFIG" >> $GITHUB_ENV
+          echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "CC=gcc-11" >> $GITHUB_ENV
+          echo "LD=ld.gold" >> $GITHUB_ENV
+          echo "AR=aarch64-linux-gnu-ar" >> $GITHUB_ENV
+          echo "NM=aarch64-linux-gnu-nm" >> $GITHUB_ENV
+          echo "OBJCOPY=aarch64-linux-gnu-objcopy" >> $GITHUB_ENV
+          echo "OBJDUMP=aarch64-linux-gnu-objdump" >> $GITHUB_ENV
+          echo "STRIP=aarch64-linux-gnu-strip" >> $GITHUB_ENV
+          echo "CONFIG=${{ inputs.repo }}" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Kernel Source
         run: |
-          git clone https://github.com/spanish33/AnyKernel3.git -b 15.0.0-sultan-zuma
-          git clone https://github.com/spanish33/${{ inputs.repo }} -b sultan-susfs
+          git clone --depth=1 https://github.com/spanish33/AnyKernel3.git -b 15.0.0-sultan-zuma
+          git clone --depth=1 https://github.com/spanish33/${{ inputs.repo }} -b sultan-susfs
 
       - name: Add KernelSU
         run: |
           cd "${{ env.CONFIG }}"
           curl -LSs "https://raw.githubusercontent.com/spanish33/kernelsu/main/kernel/setup.sh" | bash -
 
-      - name: Add SUSFS Configuration
+      - name: Apply SUSFS and Kernel Config Patches
         run: |
           cd "${{ env.CONFIG }}"
           DEFCONFIG=arch/arm64/configs/${{ inputs.codename }}_defconfig
@@ -77,36 +102,41 @@ jobs:
           echo "CONFIG_TMPFS_XATTR=y" >> $DEFCONFIG
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> $DEFCONFIG
 
-      - name: Update Local Version
+      - name: Configure Kernel and Enable GCC LTO
         run: |
+          set -e
           cd "${{ env.CONFIG }}"
-          sed -i 's/CONFIG_LOCALVERSION="-Sultan"/CONFIG_LOCALVERSION="-android14-11-gd7dac4b14270-ab12946699"/' \
-            ./arch/arm64/configs/${{ inputs.codename }}_defconfig
+          DEFCONFIG=${{ inputs.codename }}_defconfig
 
-      - name: Generate Config and Enable ThinLTO
-        run: |
-          cd "${{ env.CONFIG }}"
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- ${{ inputs.codename }}_defconfig
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          make O=out ARCH=arm64 $DEFCONFIG
+          make O=out ARCH=arm64 olddefconfig
 
-          # Enable GCC LTO + ThinLTO
+          cp out/.config out/.config.before_lto
+
           scripts/config --file out/.config -e LTO
           scripts/config --file out/.config -e LTO_GCC
-          scripts/config --file out/.config -e THINLTO
-
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          scripts/config --file out/.config -e THIN_LTO
+          make O=out ARCH=arm64 olddefconfig
+          
+          # Add the -flto=thin flag to the kernel build process
+          echo "EXTRA_CFLAGS += -flto=thin" >> out/.config
 
       - name: Patch Makefile to allow LTO
         run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/ifdef CONFIG_LTO/,/endif/ s/-fno-lto//' Makefile
+         
+      - name: Debug Config Differences
+        run: |
           cd "${{ env.CONFIG }}"
-          sed -i '/ifdef CONFIG_LTO/,/endif/ s/-fno-lto//' Makefile
+          diff -u out/.config.before_lto out/.config || echo "No config differences detected."
 
       - name: Build the Kernel
         run: |
           cd "${{ env.CONFIG }}"
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc --all)
+          make O=out -j$(nproc --all)
 
-      - name: Copy Kernel Images
+      - name: Copy Images
         run: |
           cd "${{ env.CONFIG }}"
           cp out/arch/arm64/boot/Image.lz4 ../AnyKernel3/Image.lz4
@@ -115,7 +145,7 @@ jobs:
       - name: Create Flashable ZIP
         run: |
           cd AnyKernel3
-          ZIP_NAME="${{ inputs.codename }}_Test_ThinLTO.zip"
+          ZIP_NAME="${{ inputs.codename }}_ltotest_${{ github.sha }}.zip"
           zip -r "../$ZIP_NAME" ./*
 
       - name: Upload Build Artifacts
@@ -123,4 +153,4 @@ jobs:
         with:
           name: kernel-${{ inputs.codename }}
           path: |
-            *.zip
+            ./${{ inputs.codename }}_ltotest_*.zip
