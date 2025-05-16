@@ -70,7 +70,6 @@ jobs:
         run: |
          cd "${{ env.CONFIG }}"
          sed -i '/uint32 cur_framelen;/a\        (void)cur_framelen;' google-modules/wlan/bcm4398/dhd_ip.c
-		 
       - name: Suppress unused warning for free_cnt
         run: |
          cd "${{ env.CONFIG }}"
