@@ -104,23 +104,12 @@ jobs:
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> $DEFCONFIG
           echo "# CONFIG_LTO_NONE is not set" >> $DEFCONFIG
 
-      - name: Apply Makefile Patch for LTO
-        run: |
-         cd "${{ env.CONFIG }}"
-         echo "Patching Makefile to support -flto=thin"
-         sed -i '/export CC_FLAGS_LTO/a\
-         ifdef CONFIG_THIN_LTO\nCC_FLAGS_LTO += -flto=thin\nendif' Makefile
-
       - name: Show modified Makefile section
         run: |
          cd "${{ env.CONFIG }}"
          grep -A5 'export CC_FLAGS_LTO' Makefile
 
-      - name: Set MAKEFLAGS for parallel builds
-        run: |
-          echo "Setting MAKEFLAGS for parallel build"
-          echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
-          
+         
       - name: Configure Kernel and Enable GCC LTO
         run: |
           set -e
@@ -136,7 +125,6 @@ jobs:
           scripts/config --file out/.config -e LTO
           scripts/config --file out/.config -e LTO_GCC
           scripts/config --file out/.config -e THIN_LTO
-          scripts/config --file out/.config -n LTO_NONE
           make O=out ARCH=arm64 olddefconfig
 
       - name: Debug:Confirm LTO Options in .config
