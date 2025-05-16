@@ -134,12 +134,25 @@ jobs:
           scripts/config --file out/.config -e LTO_GCC
           scripts/config --file out/.config -e THIN_LTO
           make O=out ARCH=arm64 olddefconfig
-          
+
+      - name: Debug:Confirm LTO Options in .config
+        run: |
+         cd "${{ env.CONFIG }}"
+         grep -E '^CONFIG_LTO|^CONFIG_LTO_GCC|^CONFIG_THIN_LTO' out/.config || echo "LTO options not found!"
+
       - name: Patch Makefile to allow LTO
         run: |
          cd "${{ env.CONFIG }}"
          sed -i '/ifdef CONFIG_LTO/,/endif/ s/-fno-lto//' Makefile
-         
+
+      - name: Debug:Show CC_FLAGS_LTO Makefile Section
+        run: |
+         cd "${{ env.CONFIG }}"
+         echo "Dumping Makefile LTO section:"
+         awk '/CC_FLAGS_LTO/ {print NR, $0}' Makefile
+         grep -A4 'export CC_FLAGS_LTO' Makefile
+
+
       - name: Debug Config Differences
         run: |
           cd "${{ env.CONFIG }}"
