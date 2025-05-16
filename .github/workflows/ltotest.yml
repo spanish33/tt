@@ -71,29 +71,6 @@ jobs:
           git clone --depth=1 https://github.com/spanish33/AnyKernel3.git -b 15.0.0-sultan-zuma
           git clone --depth=1 https://github.com/spanish33/${{ inputs.repo }} -b sultan-susfs
 
-      - name: Patch Makefile LTO to use -flto=thin only with CONFIG_THIN_LTO
-        run: |
-          cd "${{ env.CONFIG }}"
-          echo "Cleaning up LTO flags in Makefile..."
-
-          # Remove all hardcoded or duplicate -flto flags from CC_FLAGS_LTO
-          sed -i '/^CC_FLAGS_LTO.*-flto/d' Makefile
-
-          # Append controlled block at the end of LTO ifdef
-          awk '
-          BEGIN { injected = 0 }
-          /^ifdef CONFIG_LTO/ {
-              print; next
-          }
-          /^endif/ && !injected {
-              print "";
-              print "ifdef CONFIG_THIN_LTO";
-              print "CC_FLAGS_LTO += -flto=thin";
-              print "endif";
-              injected = 1;
-          }
-          { print }
-          ' Makefile > Makefile.patched && mv Makefile.patched Makefile
 
       - name: Add KernelSU
         run: |
