@@ -170,6 +170,13 @@ jobs:
         run: |
          cd "${{ env.CONFIG }}"
          sed -i '/ifdef CONFIG_LTO/,/endif/ s/-fno-lto//' Makefile
+      - name: Inject Thin LTO flags into Makefile
+        run: |
+          cd "${{ env.CONFIG }}"
+
+          # Add Thin LTO flags under correct CONFIG_THIN_LTO check
+          sed -i '/^ifdef CONFIG_THIN_LTO$/a \
+          CC_FLAGS_LTO += -flto=thin' Makefile
 
       - name: Debug:Show CC_FLAGS_LTO Makefile Section
         run: |
