@@ -102,7 +102,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> $DEFCONFIG
           echo "CONFIG_TMPFS_XATTR=y" >> $DEFCONFIG
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> $DEFCONFIG
-          echo "# CONFIG_LTO_NONE is not set" >> $DEFCONFIG
+
 
       - name: Show modified Makefile section
         run: |
