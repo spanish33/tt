@@ -114,18 +114,20 @@ jobs:
         run: |
          set -e
          cd "${{ env.CONFIG }}"
-         DEFCONFIG=${{ inputs.codename }}_defconfig  # ✅ Just the filename
+         DEFCONFIG=${{ inputs.codename }}_defconfig
 
-         # Optional: edit the defconfig if needed
+         # ✅ Remove LTO_NONE early from the base defconfig
          sed -i '/CONFIG_LTO_NONE/d' arch/arm64/configs/$DEFCONFIG
 
-         # Load defconfig and generate full config
          make O=out ARCH=arm64 $DEFCONFIG
          make O=out ARCH=arm64 olddefconfig
 
          cp out/.config out/.config.before_lto
 
+         # ✅ Disable LTO_NONE in final config
          scripts/config --file out/.config -d LTO_NONE
+
+         # ✅ Enable proper LTO flags
          scripts/config --file out/.config -e LTO
          scripts/config --file out/.config -e LTO_GCC
          scripts/config --file out/.config -e THIN_LTO
