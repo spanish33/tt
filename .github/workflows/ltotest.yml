@@ -135,9 +135,6 @@ jobs:
           scripts/config --file out/.config -e THIN_LTO
           make O=out ARCH=arm64 olddefconfig
           
-          # Add the -flto=thin flag to the kernel build process
-          echo "EXTRA_CFLAGS += -flto=thin" >> out/.config
-
       - name: Patch Makefile to allow LTO
         run: |
          cd "${{ env.CONFIG }}"
