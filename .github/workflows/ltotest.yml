@@ -75,6 +75,11 @@ jobs:
          cd "${{ env.CONFIG }}"
          sed -i '/uint32 count, free_cnt = 0U, wordix, idmap_ix, bitix, \*bitmap_p;/a\        (void)free_cnt;' google-modules/wlan/bcm4398/bcmutils.c
 
+      - name: Suppress unused warning for band in wl_android.c
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/uint16 band = 0;/a\        (void)band;' google-modules/wlan/bcm4398/wl_android.c
+
          
       - name: Add KernelSU
         run: |
