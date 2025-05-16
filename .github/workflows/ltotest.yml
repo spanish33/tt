@@ -156,10 +156,15 @@ jobs:
          find . -name .gcip_defs.h -exec sed -i \
          's/#define gcip_mailbox_do_consume_responses\.llvm\.[^ ]*/#define gcip_mailbox_do_consume_responses_llvm_fix/' {} +
 
+      - name: Apply Patch to Fix Macro Name Formatting
+        run: |
+         cd "${{ env.CONFIG }}"
+         find . -type f -name ".gcip_defs.h" -exec sed -i 's/#define \([a-zA-Z0-9._-]*\)\.\([0-9]*\)/#define \1.\2 /' {} +
+
       - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-Wno-c23-extensions -Wno-format-security" -j$(nproc)
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-parentheses-equality -Wno-format-security" -j$(nproc)
           ccache --show-stats
 
       - name: Copy Images
