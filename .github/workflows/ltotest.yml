@@ -126,6 +126,11 @@ jobs:
 
           # Apply the patch to the Makefile
           git apply patch_modify_makefile.diff
+
+      - name: Set MAKEFLAGS for parallel builds
+        run: |
+          echo "Setting MAKEFLAGS for parallel build"
+          echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
           
       - name: Configure Kernel and Enable GCC LTO
         run: |
