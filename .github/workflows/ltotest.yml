@@ -104,28 +104,15 @@ jobs:
 
       - name: Apply Makefile Patch for LTO
         run: |
-          cd "${{ env.CONFIG }}"
-          # Create the patch file to modify the Makefile
-          echo "Creating patch to enable -flto=thin"
-          cat > patch_modify_makefile.diff <<EOF
-          --- Makefile
-          +++ Makefile
-          @@ -50,6 +50,9 @@
-          # enable LTO if necessary
-          ifdef CONFIG_LTO
-            KBUILD_CFLAGS += -fno-lto \$(CC_FLAGS_LTO)
-            KBUILD_AFLAGS += -fno-lto
-            export CC_FLAGS_LTO
+         cd "${{ env.CONFIG }}"
+         echo "Patching Makefile to support -flto=thin"
+         sed -i '/export CC_FLAGS_LTO/a\
+         ifdef CONFIG_THIN_LTO\nCC_FLAGS_LTO += -flto=thin\nendif' Makefile
 
-          +# Add -flto=thin for Thin LTO if CONFIG_THIN_LTO is enabled
-          +ifdef CONFIG_THIN_LTO
-          +  CC_FLAGS_LTO += -flto=thin
-          +endif
-          endif
-          EOF
-
-          # Apply the patch to the Makefile
-          git apply patch_modify_makefile.diff
+      - name: Show modified Makefile section
+        run: |
+         cd "${{ env.CONFIG }}"
+         grep -A5 'export CC_FLAGS_LTO' Makefile
 
       - name: Set MAKEFLAGS for parallel builds
         run: |
