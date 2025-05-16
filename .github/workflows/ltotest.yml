@@ -164,7 +164,8 @@ jobs:
       - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-parentheses-equality -Wno-format-security" -j$(nproc)
+          export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-parentheses-equality -Wno-format-security"
+          make V=1 O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
           ccache --show-stats
 
       - name: Copy Images
