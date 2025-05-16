@@ -161,6 +161,12 @@ jobs:
           cd "${{ env.CONFIG }}"
           diff -u out/.config.before_lto out/.config || echo "No config differences detected."
 
+      - name: Debug Kernel Build Flags Before Build
+        run: |
+          cd "${{ env.CONFIG }}"
+          # Print the flags being passed to the compiler
+          make O=out ARCH=arm64 -n | grep "gcc"
+          
       - name: Build the Kernel
         run: |
           cd "${{ env.CONFIG }}"
