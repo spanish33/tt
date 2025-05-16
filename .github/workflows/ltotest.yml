@@ -80,6 +80,24 @@ jobs:
          cd "${{ env.CONFIG }}"
          sed -i '/uint16 band = 0;/a\        (void)band;' google-modules/wlan/bcm4398/wl_android.c
 
+      - name: Suppress unused warning for band in wl_android.c
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/uint16 band = 0;/a\        (void)band;' google-modules/wlan/bcm4398/wl_android.c
+
+      - name: Fix extraneous parentheses in wl_cfgvif.c
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i 's/(chan_array\[j\] == CHSPEC_CHANNEL(chspec))/(chan_array[j] == CHSPEC_CHANNEL(chspec))/' \
+         google-modules/wlan/bcm4398/wl_cfgvif.c
+
+      - name: Patch invalid macro name in .gcip_defs.h
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i 's/#define gcip_mailbox_do_consume_responses\.llvm\.[^ ]*/#define gcip_mailbox_do_consume_responses_llvm_fix/' \
+         google-modules/edgetpu/rio/drivers/edgetpu/.gcip_defs.h
+
+
          
       - name: Add KernelSU
         run: |
