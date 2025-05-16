@@ -1,0 +1,156 @@
+name: ltotest
+
+permissions:
+  contents: write  
+  actions: write   
+
+on:
+  workflow_call: 
+    inputs:
+      codename:
+        required: true
+        type: string
+      repo:
+        required: true
+        type: string
+
+jobs:
+  ltotest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          swap-size-mb: 8192
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
+      - name: Install toolchain and dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses5-dev \
+            git \
+            curl \
+            python3 \
+            zlib1g-dev \
+            libelf-dev \
+            ccache \
+            wget \
+            gcc-11 \
+            g++-11 \
+            gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            zip
+
+      - name: Set environment variables
+        run: |
+          echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "CC=gcc-11" >> $GITHUB_ENV
+          echo "LD=ld.gold" >> $GITHUB_ENV
+          echo "AR=aarch64-linux-gnu-ar" >> $GITHUB_ENV
+          echo "NM=aarch64-linux-gnu-nm" >> $GITHUB_ENV
+          echo "OBJCOPY=aarch64-linux-gnu-objcopy" >> $GITHUB_ENV
+          echo "OBJDUMP=aarch64-linux-gnu-objdump" >> $GITHUB_ENV
+          echo "STRIP=aarch64-linux-gnu-strip" >> $GITHUB_ENV
+          echo "CONFIG=${{ inputs.repo }}" >> $GITHUB_ENV
+
+      - name: Clone AnyKernel3 and Kernel Source
+        run: |
+          git clone --depth=1 https://github.com/spanish33/AnyKernel3.git -b 15.0.0-sultan-zuma
+          git clone --depth=1 https://github.com/spanish33/${{ inputs.repo }} -b sultan-susfs
+
+      - name: Patch Makefile to allow LTO
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/ifdef CONFIG_LTO/,/endif/ s/-fno-lto//' Makefile
+
+      - name: Add KernelSU
+        run: |
+          cd "${{ env.CONFIG }}"
+          curl -LSs "https://raw.githubusercontent.com/spanish33/kernelsu/main/kernel/setup.sh" | bash -
+
+      - name: Apply SUSFS and Kernel Config Patches
+        run: |
+          cd "${{ env.CONFIG }}"
+          DEFCONFIG=arch/arm64/configs/${{ inputs.codename }}_defconfig
+
+          echo "CONFIG_KSU=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_WITH_KPROBES=n" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> $DEFCONFIG
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> $DEFCONFIG
+          echo "CONFIG_TMPFS_XATTR=y" >> $DEFCONFIG
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> $DEFCONFIG
+
+      - name: Configure Kernel and Enable GCC LTO
+        run: |
+          set -e
+          cd "${{ env.CONFIG }}"
+          DEFCONFIG=${{ inputs.codename }}_defconfig
+
+          make O=out ARCH=arm64 $DEFCONFIG
+          make O=out ARCH=arm64 olddefconfig
+
+          cp out/.config out/.config.before_lto
+
+          scripts/config --file out/.config -e LTO
+          scripts/config --file out/.config -e LTO_GCC
+          scripts/config --file out/.config -e THIN_LTO
+          make O=out ARCH=arm64 olddefconfig
+          
+          # Add the -flto=thin flag to the kernel build process
+          echo "EXTRA_CFLAGS += -flto=thin" >> out/.config
+          
+      - name: Debug Config Differences
+        run: |
+          cd "${{ env.CONFIG }}"
+          diff -u out/.config.before_lto out/.config || echo "No config differences detected."
+
+      - name: Build the Kernel
+        run: |
+          cd "${{ env.CONFIG }}"
+          make O=out -j$(nproc --all)
+
+      - name: Copy Images
+        run: |
+          cd "${{ env.CONFIG }}"
+          cp out/arch/arm64/boot/Image.lz4 ../AnyKernel3/Image.lz4
+          cat out/google-devices/zuma/dts/*.dtb > ../AnyKernel3/dtb
+
+      - name: Create Flashable ZIP
+        run: |
+          cd AnyKernel3
+          ZIP_NAME="${{ inputs.codename }}_ltotest_${{ github.sha }}.zip"
+          zip -r "../$ZIP_NAME" ./*
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ inputs.codename }}
+          path: |
+            ./${{ inputs.codename }}_ltotest_*.zip
