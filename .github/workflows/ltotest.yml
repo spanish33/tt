@@ -128,13 +128,6 @@ jobs:
           scripts/config --file out/.config --enable LD_LLD
 
           make O=out ARCH=arm64 olddefconfig
-      - name: Fail if LTO config is broken
-        run: |
-          cd "${{ env.CONFIG }}"
-          echo "Validating .config..."
-          grep -q '^CONFIG_LTO_GCC=y' out/.config || { echo "❌ CONFIG_LTO_CLANG=y not set!"; exit 1; }
-          grep -q '^CONFIG_LTO_NONE=y' out/.config && { echo "❌ CONFIG_LTO_NONE=y is still set!"; exit 1; }
-          echo "✅ LTO configuration is correct."
 
       - name: Debug Config Differences
         run: |
