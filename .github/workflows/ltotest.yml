@@ -111,16 +111,27 @@ jobs:
          cd "${{ env.CONFIG }}"
          DEFCONFIG=${{ inputs.codename }}_defconfig
 
-         # Use scripts/config to finalize LTO setup
-         scripts/config --file out/.config -d LTO_NONE
-         scripts/config --file out/.config -e LTO
-         scripts/config --file out/.config -e LTO_GCC
-         scripts/config --file out/.config -e THIN_LTO
+      - name: Configure Kernel and Enable GCC LTO
+        run: |
+          set -e
+          cd "${{ env.CONFIG }}"
+          DEFCONFIG=${{ inputs.codename }}_defconfig
 
-         make O=out ARCH=arm64 olddefconfig
+          make O=out ARCH=arm64 $DEFCONFIG
+          make O=out ARCH=arm64 olddefconfig
 
-         echo "=== FINAL LTO CONFIGS ==="
-         grep -E '^CONFIG_LTO(_|$)' out/.config || echo "No LTO configs found!"
+          cp out/.config out/.config.before_lto
+          
+          scripts/config --file out/.config -d LTO_NONE
+          scripts/config --file out/.config -e LTO
+          scripts/config --file out/.config -e LTO_GCC
+          scripts/config --file out/.config -e THIN_LTO
+          make O=out ARCH=arm64 olddefconfig
+
+      - name: Debug:Confirm LTO Options in .config
+        run: |
+         cd "${{ env.CONFIG }}"
+         grep -E '^CONFIG_LTO|^CONFIG_LTO_GCC|^CONFIG_THIN_LTO' out/.config || echo "LTO options not found!"
 
 
        
