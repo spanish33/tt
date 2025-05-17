@@ -234,21 +234,46 @@ jobs:
          fi
 
 
-      - name: Fix corrupted GCIP macro definitions and patch function
+- name: Remove stale .gcip_defs.h files
         run: |
-         cd "${{ env.CONFIG }}"
-         # Replace function definition
-         find . -type f -name 'gcip-mailbox.c' -exec sed -i \
-         's/^static void gcip_mailbox_.*_responses.*$/static void gcip_mailbox_response_handler_custom_fix(struct gcip_mailbox *mailbox, bool trylock)/' {} +
+          echo "🧼 Removing old .gcip_defs.h macro definitions..."
+          find "${{ env.CONFIG }}" -name ".gcip_defs.h" -exec rm -f {} +
 
-          # Replace all call sites
+      - name: Check for macro conflict on new function name
+        run: |
+          set -euo pipefail
+          SEARCH_DIR="${{ env.CONFIG }}"
+          NEW_FUNC_NAME="__gcip_response_hndlr_custom_avoid_macro_8742"
+          echo "🔍 Checking for macro conflicts with '${NEW_FUNC_NAME}'..."
+          macro_conflict=$(grep -r -w -E "^#define[[:space:]]+${NEW_FUNC_NAME}\b" "$SEARCH_DIR" || true)
+
+          if [[ -n "$macro_conflict" ]]; then
+            echo "❌ Conflict detected! '${NEW_FUNC_NAME}' is already defined as a macro:"
+            echo "$macro_conflict"
+            exit 1
+          else
+            echo "✅ No macro conflicts detected. Proceeding..."
+          fi
+
+      - name: Patch GCIP function name and references
+        run: |
+          set -e
+          cd "${{ env.CONFIG }}"
+          NEW_FUNC_NAME="__gcip_response_hndlr_custom_avoid_macro_8742"
+
+          echo "✏️ Replacing function definition..."
+          find . -type f -name 'gcip-mailbox.c' -exec sed -i \
+            "s/^static void gcip_mailbox_.*_responses.*$/static void ${NEW_FUNC_NAME}(struct gcip_mailbox *mailbox, bool trylock)/" {} +
+
+          echo "🔁 Rewriting all function calls..."
           for fn in gcip_mailbox_do_consume_responses \
-          gcip_mailbox_do_consume_responses_impl \
-          gcip_mailbox_consume_responses_fixed; do
-          find . -type f -name '*.c' -exec sed -i \
-          "s/\\b${fn}\\b/gcip_mailbox_response_handler_custom_fix/g" {} +
+                    gcip_mailbox_do_consume_responses_impl \
+                    gcip_mailbox_consume_responses_fixed; do
+            find . -type f -name '*.c' -exec sed -i \
+              "s/\\b${fn}\\b/${NEW_FUNC_NAME}/g" {} +
           done
 
+          echo "✅ Function renaming and patch complete."
 
       - name: Build the Kernel (with warning suppressions)
         run: |
@@ -256,6 +281,11 @@ jobs:
           export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-unused-variable -Wno-unused-const-variable -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
           make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
           ccache --show-stats
+     
+      - name: Check for reappearance of macro post-build
+        run: |
+          grep -r "__gcip_response_hndlr_custom_avoid_macro_8742" "${{ env.CONFIG }}" || echo "✅ No reintroduced macro detected"
+
 
       - name: Copy Images
         run: |
