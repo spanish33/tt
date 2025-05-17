@@ -227,7 +227,7 @@ jobs:
       - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
-          export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-unused-const-variable -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
+          export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-unused-variable -Wno-unused-const-variable -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
           make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
           ccache --show-stats
 
