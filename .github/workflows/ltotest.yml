@@ -208,18 +208,27 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i '/uint32 chanspec = 0, gd_variance = 0;/a\        (void)gd_variance;' google-modules/wlan/bcm4398/dhd_rtt.c
 
-      - name: Fix unused pkt_cnt_msg declaration
+      - name: Fix pkt_cnt_msg declaration in dhd_linux_pktdump.c
         run: |
          cd "${{ env.CONFIG }}"
-         sed -i 's/static const char pkt_cnt_msg/static const char pkt_cnt_msg __unused/' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
+         sed -i '/^static const char pkt_cnt_msg.*=\s*{/i \
+         #ifndef __unused\n#define __unused __attribute__((__unused__))\n#endif' \
+         google-modules/wlan/bcm4398/dhd_linux_pktdump.c
 
-      - name: Fix gcip macro name collision
+      - name: Fix invalid macro names and usages in GCIP mailbox
         run: |
          cd "${{ env.CONFIG }}"
-         find . -name ".gcip_defs.h" -exec sed -i \
-         's/\(#define gcip_mailbox_do_consume_responses\)[.a-zA-Z0-9_-]*/\1_llvm_fix/' {} +
-         sed -i '1i#ifdef gcip_mailbox_do_consume_responses\n#undef gcip_mailbox_do_consume_responses\n#endif' \
-         google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c
+
+         echo "Patching invalid macro definitions in .gcip_defs.h..."
+         find . -name .gcip_defs.h -exec sed -i -E \
+         's/#define ([a-zA-Z0-9_]+)\.llvm\.[0-9]+/#define \1_llvm_fix/' {} +
+
+          echo "Patching all source files that use broken macro names..."
+          find . -type f -name '*.c' -exec sed -i \
+          's/gcip_mailbox_do_consume_responses/gcip_mailbox_do_consume_responses_llvm_fix/g' {} +
+
+          echo "Macro patch complete."
+
 
 
 
