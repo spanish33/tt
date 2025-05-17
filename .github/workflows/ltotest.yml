@@ -169,21 +169,28 @@ jobs:
           echo "Changing Kernel Name..."
           sed -i 's/CONFIG_LOCALVERSION="-Sultan"/CONFIG_LOCALVERSION="-android14-11-gd7dac4b14270-ab12946699"/' ./arch/arm64/configs/${{ inputs.codename }}_defconfig
 
-      - name: Wait for wl_cfgvif.c to exist and patch it
+      - name: Wait for wl_cfgvif.c and patch it when available
         run: |
          FILE="google-modules/wlan/bcm4398/wl_cfgvif.c"
-         echo "Waiting for $FILE to become available..."
-         for i in {1..1000}; do
-         if [ -f "$FILE" ]; then
-         echo "Found $FILE. Patching line 1940..."
-         sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
-         exit 0
+         MAX_WAIT_SECONDS=1500  
+         INTERVAL=3
+         WAITED=0
+
+         echo "Waiting for $FILE to appear..."
+
+         while [ ! -f "$FILE" ]; do
+         if [ "$WAITED" -ge "$MAX_WAIT_SECONDS" ]; then
+         echo "Timeout: $FILE not found after $MAX_WAIT_SECONDS seconds."
+         exit 0  # Not a hard failure
          fi
-         continue-on-error: true
-         sleep 2
+         sleep "$INTERVAL"
+         WAITED=$((WAITED + INTERVAL))
          done
-         echo "Error: $FILE not found after waiting. Exiting."
-         exit 1
+
+         echo "$FILE found. Patching line 1940..."
+         sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
+         echo "Patch applied."
+
 
 
 
