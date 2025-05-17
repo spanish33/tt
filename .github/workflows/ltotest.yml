@@ -209,6 +209,10 @@ jobs:
          find . -type f -name '*.c' -exec sed -i \
          's/\bgcip_mailbox_do_consume_responses[_a-zA-Z0-9]*\b/gcip_mailbox_do_consume_responses/g' {} +
 
+      - name: Debug file existence
+        run: |
+         find . -type f -name gcip-mailbox.c
+
       - name: Patch gcip_mailbox_do_consume_responses
         run: |
          FILE="google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c"
