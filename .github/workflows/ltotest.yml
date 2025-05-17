@@ -202,18 +202,18 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i 's/^static const char pkt_cnt_msg/__attribute__((__unused__)) static const char pkt_cnt_msg/' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
 
-      - name: Delete invalid GCIP macro definitions and replace usage
+      - name: Delete broken GCIP macro definitions and replace usage
         run: |
-          cd "${{ env.CONFIG }}"
+         cd "${{ env.CONFIG }}"
+         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_do_consume_responses[_a-zA-Z0-9]*\b/gcip_mailbox_do_consume_responses/g' {} +
 
-          echo "Removing broken GCIP macro definitions..."
-          find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
+      - name: Suppress unused warning for chip_rev
+        run: |
+         cd "${{ env.CONFIG }}"
+         sed -i '/int board_type = 0, chip_rev = 0, vid_length = 0;/a\        (void)chip_rev;' google-modules/wlan/bcm4398/dhd_custom_cis.c
 
-          echo "Replacing all macro usages with direct function call..."
-          find . -type f -name '*.c' -exec sed -i \
-            's/\bgcip_mailbox_do_consume_responses[_a-zA-Z0-9]*\b/gcip_mailbox_do_consume_responses/g' {} +
-
-          echo "GCIP macro cleanup complete."
 
       - name: Suppress unused warning for total_md_len
         run: |
