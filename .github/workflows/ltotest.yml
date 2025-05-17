@@ -266,6 +266,8 @@ jobs:
 
           /* === GCIP MAILBOX HOOK SUPPORT === */
           static void (*gcip_mailbox_response_hook)(struct gcip_mailbox *, bool) = NULL;
+          /* Forward declaration */
+          static void gcip_mailbox_do_consume_responses_internal(struct gcip_mailbox *mailbox, bool trylock);
 
           void register_gcip_mailbox_response_hook(void (*hook_fn)(struct gcip_mailbox *, bool))
           {
