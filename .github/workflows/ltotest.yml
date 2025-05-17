@@ -213,16 +213,14 @@ jobs:
         run: |
          find . -type f -name gcip-mailbox.c
 
-      - name: Patch gcip_mailbox_do_consume_responses
+      - name: Patch all gcip_mailbox_do_consume_responses occurrences
         run: |
-         FILE="google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c"
-         if [ -f "$FILE" ]; then
+         find android_kernel_google_zuma -type f -name "gcip-mailbox.c" | while read FILE; do
+         echo "Patching $FILE"
          sed -i 's/static void gcip_mailbox_do_consume_responses(/static void gcip_mailbox_do_consume_responses_impl(/' "$FILE"
          sed -i 's/\bgcip_mailbox_do_consume_responses(/gcip_mailbox_do_consume_responses_impl(/g' "$FILE"
-         else
-         echo "File not found: $FILE"
-         exit 1
-         fi
+         done
+
 
 
       - name: Suppress unused warning for chip_rev
