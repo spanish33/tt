@@ -209,11 +209,11 @@ jobs:
          find . -type f -name 'gcip-mailbox.c' -exec sed -i \
          's/static void gcip_mailbox_do_consume_responses.*/static void gcip_mailbox_consume_responses_fixed(struct gcip_mailbox *mailbox, bool trylock)/' {} +
 
-        find . -type f -name '*.c' -exec sed -i \
-        's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
 
-        find . -type f -name '*.c' -exec sed -i \
-        's/\bgcip_mailbox_do_consume_responses_impl\b/gcip_mailbox_consume_responses_fixed/g' {} +
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_do_consume_responses_impl\b/gcip_mailbox_consume_responses_fixed/g' {} +
 
 
 
