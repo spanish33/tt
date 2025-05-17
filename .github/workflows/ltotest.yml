@@ -169,13 +169,17 @@ jobs:
           echo "Changing Kernel Name..."
           sed -i 's/CONFIG_LOCALVERSION="-Sultan"/CONFIG_LOCALVERSION="-android14-11-gd7dac4b14270-ab12946699"/' ./arch/arm64/configs/${{ inputs.codename }}_defconfig
 
-      - name: Patch wl_cfgvif.c if it exists
+      - name: Patch wl_cfgvif.c to fix parentheses warning
         run: |
-         if [ -f google-modules/wlan/bcm4398/wl_cfgvif.c ]; then
-         sed -i '1940s/((\([^)]*\)))/\1/' google-modules/wlan/bcm4398/wl_cfgvif.c
-         else
-         echo "wl_cfgvif.c not found, skipping patch"
-         fi
+          FILE="google-modules/wlan/bcm4398/wl_cfgvif.c"
+          if [ -f "$FILE" ]; then
+            echo "Patching $FILE at line 1940..."
+            sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
+          else
+            echo "$FILE not found. Skipping patch."
+            exit 1
+          fi
+
 
       - name: Build the Kernel (with warning suppressions)
         run: |
