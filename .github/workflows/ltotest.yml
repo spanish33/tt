@@ -145,11 +145,6 @@ jobs:
           cd "${{ env.CONFIG }}"
           diff -u out/.config.before_lto out/.config || echo "No config differences detected."
 
-      - name: Apply Patch to Fix Macro Name Formatting
-        run: |
-         cd "${{ env.CONFIG }}"
-         find . -type f -name ".gcip_defs.h" -exec sed -i 's/#define \([a-zA-Z0-9._-]*\)\.\([0-9]*\)/#define \1.\2 /' {} +
-
       - name: Change Kernel Name
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -202,25 +197,19 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i 's/^static const char pkt_cnt_msg/__attribute__((__unused__)) static const char pkt_cnt_msg/' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
 
-      - name: Delete broken GCIP macro definitions and replace usage
+      - name: Fix corrupted GCIP macro definitions and patch function
         run: |
-         cd "${{ env.CONFIG }}"
-         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
-         find . -type f -name '*.c' -exec sed -i \
-         's/\bgcip_mailbox_do_consume_responses[_a-zA-Z0-9]*\b/gcip_mailbox_do_consume_responses/g' {} +
+          cd "${{ env.CONFIG }}"
 
-      - name: Debug file existence
-        run: |
-         find . -type f -name gcip-mailbox.c
+          echo "🔍 Removing corrupted macro definitions..."
+          find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
+          find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses_impl/d' {} +
 
-      - name: Patch all gcip_mailbox_do_consume_responses occurrences
-        run: |
-         find android_kernel_google_zuma -type f -name "gcip-mailbox.c" | while read FILE; do
-         echo "Patching $FILE"
-         sed -i 's/static void gcip_mailbox_do_consume_responses(/static void gcip_mailbox_do_consume_responses_impl(/' "$FILE"
-         sed -i 's/\bgcip_mailbox_do_consume_responses(/gcip_mailbox_do_consume_responses_impl(/g' "$FILE"
-         done
+          echo "🔁 Renaming function and all uses from gcip_mailbox_do_consume_responses → gcip_mailbox_consume_responses_fixed..."
+          find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i \
+            's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
 
+          echo "✅ Patch completed. Proceeding to build..."
 
 
       - name: Suppress unused warning for chip_rev
