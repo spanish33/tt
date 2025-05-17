@@ -234,7 +234,7 @@ jobs:
          fi
 
 
-- name: Remove stale .gcip_defs.h files
+      - name: Remove stale .gcip_defs.h files
         run: |
           echo "🧼 Removing old .gcip_defs.h macro definitions..."
           find "${{ env.CONFIG }}" -name ".gcip_defs.h" -exec rm -f {} +
