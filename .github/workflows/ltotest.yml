@@ -207,7 +207,7 @@ jobs:
 
          # Rename function definition and calls
          find . -type f -name 'gcip-mailbox.c' -exec sed -i \
-        's/static void gcip_mailbox_do_consume_responses.*/static void gcip_mailbox_consume_responses_fixed(struct gcip_mailbox *mailbox, bool trylock)/' {} +
+         's/static void gcip_mailbox_do_consume_responses.*/static void gcip_mailbox_consume_responses_fixed(struct gcip_mailbox *mailbox, bool trylock)/' {} +
 
         find . -type f -name '*.c' -exec sed -i \
         's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
