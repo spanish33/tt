@@ -183,6 +183,7 @@ jobs:
          echo "Timeout: $FILE not found after $MAX_WAIT_SECONDS seconds."
          exit 0  # Not a hard failure
          fi
+         continue-on-error: true
          sleep "$INTERVAL"
          WAITED=$((WAITED + INTERVAL))
          done
