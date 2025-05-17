@@ -213,31 +213,28 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i '/uint32 total_md_len = 0;/a\        (void)total_md_len;' google-modules/wlan/bcm4398/dhd_msgbuf.c
 
-
       - name: Fix corrupted GCIP macro definitions and patch function
         run: |
          cd "${{ env.CONFIG }}"
 
-         echo "🔍 Removing corrupted macro definitions..."
-         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
-         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses_impl/d' {} +
-         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_consume_responses_fixed/d' {} +
+         echo "🧹 Removing all corrupted GCIP macro definitions..."
+         find . -name ".gcip_defs.h" -exec sed -i '/gcip_mailbox/d' {} +
 
-         echo "🔁 Renaming function and calls to a unique name: gcip_mailbox_response_handler_safe"
+         echo "✏️ Renaming function definition to use a clean name..."
          find . -type f -name 'gcip-mailbox.c' -exec sed -i \
-         's/static void gcip_mailbox_.*responses.*/static void gcip_mailbox_response_handler_safe(struct gcip_mailbox *mailbox, bool trylock)/' {} +
+         's/static void gcip_mailbox_.*responses.*/static void mailbox_response_handler_clean(struct gcip_mailbox *mailbox, bool trylock)/' {} +
+
+         echo "🔁 Rewriting all function calls to use the clean name..."
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_do_consume_responses\b/mailbox_response_handler_clean/g' {} +
 
          find . -type f -name '*.c' -exec sed -i \
-         's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_response_handler_safe/g' {} +
+         's/\bgcip_mailbox_do_consume_responses_impl\b/mailbox_response_handler_clean/g' {} +
 
          find . -type f -name '*.c' -exec sed -i \
-         's/\bgcip_mailbox_do_consume_responses_impl\b/gcip_mailbox_response_handler_safe/g' {} +
+         's/\bgcip_mailbox_consume_responses_fixed\b/mailbox_response_handler_clean/g' {} +
 
-         find . -type f -name '*.c' -exec sed -i \
-         's/\bgcip_mailbox_consume_responses_fixed\b/gcip_mailbox_response_handler_safe/g' {} +
-
-         echo "✅ Patch complete. Continuing build..."
-
+         echo "✅ GCIP patch complete. Build can proceed..."
 
 
       - name: Build the Kernel (with warning suppressions)
