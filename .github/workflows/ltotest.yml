@@ -50,7 +50,7 @@ jobs:
           echo "LLVM=1" >> $GITHUB_ENV
           echo "LLVM_IAS=1" >> $GITHUB_ENV
           echo "CONFIG=${{ inputs.repo }}" >> $GITHUB_ENV
-          echo "KERNEL_SRC=android_kernel_google_zuma" >> $GITHUB_ENV
+          echo "KERNEL_SRC=${{ inputs.repo }}" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Kernel Source
         run: |
@@ -272,7 +272,7 @@ jobs:
           gcip_mailbox_response_hook = hook_fn;
           }
 
-          void gcip_mailbox_consume_responses(struct gcip_mailbox *mailbox, bool trylock)
+          void gcip_mailbox_consume_responses_hook(struct gcip_mailbox *mailbox, bool trylock)
           {
           if (gcip_mailbox_response_hook)
           gcip_mailbox_response_hook(mailbox, trylock);
