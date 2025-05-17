@@ -202,19 +202,23 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i 's/^static const char pkt_cnt_msg/__attribute__((__unused__)) static const char pkt_cnt_msg/' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
 
-      - name: Sanitize invalid .gcip_defs.h macros and replace calls
+      - name: Delete invalid GCIP macro definitions and replace usage
         run: |
           cd "${{ env.CONFIG }}"
 
-          echo "Fixing invalid macro names in .gcip_defs.h..."
-          find . -name ".gcip_defs.h" -exec sed -i -E \
-            's/^#define ([a-zA-Z0-9_]+)\.llvm\.[0-9]+/#define \1_fix/' {} +
+          echo "Removing broken GCIP macro definitions..."
+          find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
 
-          echo "Fixing calls to renamed functions in .c files..."
+          echo "Replacing all macro usages with direct function call..."
           find . -type f -name '*.c' -exec sed -i \
-            's/gcip_mailbox_do_consume_responses/gcip_mailbox_do_consume_responses_fix/g' {} +
+            's/\bgcip_mailbox_do_consume_responses[_a-zA-Z0-9]*\b/gcip_mailbox_do_consume_responses/g' {} +
 
+          echo "GCIP macro cleanup complete."
 
+      - name: Suppress unused warning for total_md_len
+        run: |
+          cd "${{ env.CONFIG }}"
+          sed -i '/uint32 total_md_len = 0;/a\        (void)total_md_len;' google-modules/wlan/bcm4398/dhd_msgbuf.c
 
 
 
