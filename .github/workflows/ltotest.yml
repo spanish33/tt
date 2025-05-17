@@ -209,6 +209,22 @@ jobs:
          find . -type f -name '*.c' -exec sed -i \
          's/\bgcip_mailbox_do_consume_responses[_a-zA-Z0-9]*\b/gcip_mailbox_do_consume_responses/g' {} +
 
+      - name: Patch gcip_mailbox_do_consume_responses to avoid macro conflict
+        run: |
+         FILE="google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c"
+
+         # Rename the function definition
+         sed -i 's/static void gcip_mailbox_do_consume_responses(/static void gcip_mailbox_do_consume_responses_impl(/' "$FILE"
+
+         # Update all function calls
+         sed -i 's/\bgcip_mailbox_do_consume_responses(/gcip_mailbox_do_consume_responses_impl(/g' "$FILE"
+
+         FILE2="google-modules/gxp/zuma/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c"
+
+         # Apply the same sed changes to the other variant
+         sed -i 's/static void gcip_mailbox_do_consume_responses(/static void gcip_mailbox_do_consume_responses_impl(/' "$FILE2"
+         sed -i 's/\bgcip_mailbox_do_consume_responses(/gcip_mailbox_do_consume_responses_impl(/g' "$FILE2"
+
       - name: Suppress unused warning for chip_rev
         run: |
          cd "${{ env.CONFIG }}"
