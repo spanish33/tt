@@ -277,7 +277,7 @@ jobs:
           if (gcip_mailbox_response_hook)
           gcip_mailbox_response_hook(mailbox, trylock);
           else
-          gcip_mailbox_do_consume_responses(mailbox, trylock);
+          gcip_mailbox_do_consume_responses_internal(mailbox, trylock);
           }
           EOF
 
