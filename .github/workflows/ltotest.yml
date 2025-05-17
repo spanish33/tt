@@ -199,17 +199,22 @@ jobs:
 
       - name: Fix corrupted GCIP macro definitions and patch function
         run: |
-          cd "${{ env.CONFIG }}"
+         cd "${{ env.CONFIG }}"
 
-          echo "🔍 Removing corrupted macro definitions..."
-          find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
-          find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses_impl/d' {} +
+         # Delete broken macro definitions
+         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
+         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses_impl/d' {} +
 
-          echo "🔁 Renaming function and all uses from gcip_mailbox_do_consume_responses → gcip_mailbox_consume_responses_fixed..."
-          find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i \
-            's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
+         # Rename function definition and calls
+         find . -type f -name 'gcip-mailbox.c' -exec sed -i \
+        's/static void gcip_mailbox_do_consume_responses.*/static void gcip_mailbox_consume_responses_fixed(struct gcip_mailbox *mailbox, bool trylock)/' {} +
 
-          echo "✅ Patch completed. Proceeding to build..."
+        find . -type f -name '*.c' -exec sed -i \
+        's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
+
+        find . -type f -name '*.c' -exec sed -i \
+        's/\bgcip_mailbox_do_consume_responses_impl\b/gcip_mailbox_consume_responses_fixed/g' {} +
+
 
 
       - name: Suppress unused warning for chip_rev
