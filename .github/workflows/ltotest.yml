@@ -80,11 +80,6 @@ jobs:
          cd "${{ env.CONFIG }}"
          sed -i '/uint16 band = 0;/a\        (void)band;' google-modules/wlan/bcm4398/wl_android.c
 
-      - name: Suppress unused warning for band in wl_android.c
-        run: |
-         cd "${{ env.CONFIG }}"
-         sed -i '/uint16 band = 0;/a\        (void)band;' google-modules/wlan/bcm4398/wl_android.c
-
       - name: Fix extraneous parentheses in wl_cfgvif.c
         run: |
          cd "${{ env.CONFIG }}"
@@ -149,12 +144,6 @@ jobs:
         run: |
           cd "${{ env.CONFIG }}"
           diff -u out/.config.before_lto out/.config || echo "No config differences detected."
-
-      - name: Patch generated .gcip_defs.h macro name
-        run: |
-         cd "${{ env.CONFIG }}"
-         find . -name .gcip_defs.h -exec sed -i \
-         's/#define gcip_mailbox_do_consume_responses\.llvm\.[^ ]*/#define gcip_mailbox_do_consume_responses_llvm_fix/' {} +
 
       - name: Apply Patch to Fix Macro Name Formatting
         run: |
