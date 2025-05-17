@@ -50,6 +50,7 @@ jobs:
           echo "LLVM=1" >> $GITHUB_ENV
           echo "LLVM_IAS=1" >> $GITHUB_ENV
           echo "CONFIG=${{ inputs.repo }}" >> $GITHUB_ENV
+          echo "KERNEL_SRC=android_kernel_google_zuma" >> $GITHUB_ENV
 
       - name: Clone AnyKernel3 and Kernel Source
         run: |
@@ -255,16 +256,15 @@ jobs:
             echo "✅ No macro conflicts detected. Proceeding..."
           fi
 
-      - name: Inject hook registration in gcip-mailbox.c
+
+      - name: Patch gcip-mailbox.c
         run: |
-          cd "${{ env.CONFIG }}"
+          cd $KERNEL_SRC
 
-          echo "🔧 Adding hook function pointer and wrapper in gcip-mailbox.c..."
-
+          echo "📌 Patching gcip-mailbox.c to add hook..."
           cat << 'EOF' >> google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c
 
-          /* === PATCHED HOOK START === */
-
+          /* === GCIP MAILBOX HOOK SUPPORT === */
           static void (*gcip_mailbox_response_hook)(struct gcip_mailbox *, bool) = NULL;
 
           void register_gcip_mailbox_response_hook(void (*hook_fn)(struct gcip_mailbox *, bool))
@@ -274,44 +274,48 @@ jobs:
 
           void gcip_mailbox_consume_responses(struct gcip_mailbox *mailbox, bool trylock)
           {
-          if (gcip_mailbox_response_hook) {
+          if (gcip_mailbox_response_hook)
           gcip_mailbox_response_hook(mailbox, trylock);
-          } else {
+          else
           gcip_mailbox_do_consume_responses(mailbox, trylock);
           }
-          }
-          /* === PATCHED HOOK END === */
           EOF
 
-      - name: Create new file custom_hooks.c
+      - name: Create custom_hooks.c
         run: |
-          echo "🔨 Creating custom_hooks.c with your custom override..."
-          mkdir -p ${{ env.CONFIG }}/custom_hooks
+          cd $KERNEL_SRC
 
-          cat << 'EOF' > ${{ env.CONFIG }}/custom_hooks/custom_hooks.c
-          #include "../google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.h"
+          echo "🛠️ Creating custom_hooks.c..."
+          cat << 'EOF' > custom_hooks.c
+          #include <linux/init.h>
+          #include <linux/kernel.h>
+          #include "google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.h"
 
           void my_custom_mailbox_handler(struct gcip_mailbox *mailbox, bool trylock)
           {
-          // 🔁 Your custom logic goes here
+          printk(KERN_INFO "[GCIP Patch] Custom handler invoked (trylock=%d)\n", trylock);
           }
 
-          __init void init_mailbox_patch(void)
+          static int __init init_mailbox_patch(void)
           {
+          printk(KERN_INFO "[GCIP Patch] Registering custom mailbox handler...\n");
           register_gcip_mailbox_response_hook(my_custom_mailbox_handler);
+          return 0;
           }
+          late_initcall(init_mailbox_patch);
           EOF
 
-      - name: Register custom_hooks.c in Makefile
+      - name: Add custom_hooks.c to Makefile
         run: |
-          echo "📦 Adding custom_hooks.c to your build..."
-          echo "obj-y += custom_hooks/custom_hooks.o" >> ${{ env.CONFIG }}/Makefile
+          cd $KERNEL_SRC
+          echo "obj-y += custom_hooks.o" >> Makefile
+          echo "📦 Added custom_hooks.o to kernel Makefile"
 
       - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
           export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-unused-variable -Wno-unused-const-variable -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
-          make -C ${{ env.CONFIG }} O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
           ccache --show-stats
      
       - name: Check for reappearance of macro post-build
