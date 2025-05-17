@@ -255,31 +255,63 @@ jobs:
             echo "✅ No macro conflicts detected. Proceeding..."
           fi
 
-      - name: Patch GCIP function name and references
+      - name: Inject hook registration in gcip-mailbox.c
         run: |
-          set -e
           cd "${{ env.CONFIG }}"
-          NEW_FUNC_NAME="__gcip_response_hndlr_custom_avoid_macro_8742"
 
-          echo "✏️ Replacing function definition..."
-          find . -type f -name 'gcip-mailbox.c' -exec sed -i \
-            "s/^static void gcip_mailbox_.*_responses.*$/static void ${NEW_FUNC_NAME}(struct gcip_mailbox *mailbox, bool trylock)/" {} +
+          echo "🔧 Adding hook function pointer and wrapper in gcip-mailbox.c..."
 
-          echo "🔁 Rewriting all function calls..."
-          for fn in gcip_mailbox_do_consume_responses \
-                    gcip_mailbox_do_consume_responses_impl \
-                    gcip_mailbox_consume_responses_fixed; do
-            find . -type f -name '*.c' -exec sed -i \
-              "s/\\b${fn}\\b/${NEW_FUNC_NAME}/g" {} +
-          done
+          cat << 'EOF' >> google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c
 
-          echo "✅ Function renaming and patch complete."
+          /* === PATCHED HOOK START === */
+
+          static void (*gcip_mailbox_response_hook)(struct gcip_mailbox *, bool) = NULL;
+
+          void register_gcip_mailbox_response_hook(void (*hook_fn)(struct gcip_mailbox *, bool))
+          {
+          gcip_mailbox_response_hook = hook_fn;
+          }
+
+          void gcip_mailbox_consume_responses(struct gcip_mailbox *mailbox, bool trylock)
+          {
+          if (gcip_mailbox_response_hook) {
+          gcip_mailbox_response_hook(mailbox, trylock);
+          } else {
+          gcip_mailbox_do_consume_responses(mailbox, trylock);
+          }
+          }
+          /* === PATCHED HOOK END === */
+          EOF
+
+      - name: Create new file custom_hooks.c
+        run: |
+          echo "🔨 Creating custom_hooks.c with your custom override..."
+          mkdir -p ${{ env.CONFIG }}/custom_hooks
+
+          cat << 'EOF' > ${{ env.CONFIG }}/custom_hooks/custom_hooks.c
+          #include "../google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.h"
+
+          void my_custom_mailbox_handler(struct gcip_mailbox *mailbox, bool trylock)
+          {
+          // 🔁 Your custom logic goes here
+          }
+
+          __init void init_mailbox_patch(void)
+          {
+          register_gcip_mailbox_response_hook(my_custom_mailbox_handler);
+          }
+          EOF
+
+      - name: Register custom_hooks.c in Makefile
+        run: |
+          echo "📦 Adding custom_hooks.c to your build..."
+          echo "obj-y += custom_hooks/custom_hooks.o" >> ${{ env.CONFIG }}/Makefile
 
       - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
           export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-unused-variable -Wno-unused-const-variable -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
+          make -C ${{ env.CONFIG }} O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
           ccache --show-stats
      
       - name: Check for reappearance of macro post-build
