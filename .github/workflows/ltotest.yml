@@ -198,6 +198,20 @@ jobs:
             echo "File not found in time, skipping patch."
           fi
 
+      - name: Suppress unused warning for target_cnt
+        run: |
+          cd "${{ env.CONFIG }}"
+          sed -i '/int8 target_cnt = 0;/a\        (void)target_cnt;' google-modules/wlan/bcm4398/dhd_rtt.c
+
+      - name: Suppress unused warning for gd_variance
+        run: |
+          cd "${{ env.CONFIG }}"
+          sed -i '/uint32 chanspec = 0, gd_variance = 0;/a\        (void)gd_variance;' google-modules/wlan/bcm4398/dhd_rtt.c
+
+      - name: Suppress unused warning for pkt_cnt_msg
+        run: |
+          cd "${{ env.CONFIG }}"
+          sed -i '/static const char pkt_cnt_msg/a\        (void)pkt_cnt_msg;' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
 
 
 
