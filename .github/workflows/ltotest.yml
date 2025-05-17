@@ -208,10 +208,18 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i '/uint32 chanspec = 0, gd_variance = 0;/a\        (void)gd_variance;' google-modules/wlan/bcm4398/dhd_rtt.c
 
-      - name: Suppress unused warning for pkt_cnt_msg
+      - name: Fix unused pkt_cnt_msg declaration
         run: |
-          cd "${{ env.CONFIG }}"
-          sed -i '/static const char pkt_cnt_msg/a\        (void)pkt_cnt_msg;' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
+         cd "${{ env.CONFIG }}"
+         sed -i 's/static const char pkt_cnt_msg/static const char pkt_cnt_msg __unused/' google-modules/wlan/bcm4398/dhd_linux_pktdump.c
+
+      - name: Fix gcip macro name collision
+        run: |
+         cd "${{ env.CONFIG }}"
+         find . -name ".gcip_defs.h" -exec sed -i \
+         's/\(#define gcip_mailbox_do_consume_responses\)[.a-zA-Z0-9_-]*/\1_llvm_fix/' {} +
+         sed -i '1i#ifdef gcip_mailbox_do_consume_responses\n#undef gcip_mailbox_do_consume_responses\n#endif' \
+         google-modules/edgetpu/rio/drivers/edgetpu/gcip-kernel-driver/drivers/gcip/gcip-mailbox.c
 
 
 
@@ -219,7 +227,7 @@ jobs:
       - name: Build the Kernel (with warning suppressions)
         run: |
           cd "${{ env.CONFIG }}"
-          export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
+          export KCFLAGS="-Wno-c23-extensions -Wno-c99-extensions -Wno-unused-const-variable -Wno-cast-function-type-strict -Wno-parentheses-equality -Wno-format-security"
           make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
           ccache --show-stats
 
