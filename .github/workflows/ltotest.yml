@@ -183,7 +183,7 @@ jobs:
          echo "Timeout: $FILE not found after $MAX_WAIT_SECONDS seconds."
          exit 0  # Not a hard failure
          fi
-         continue-on-error: true
+         
          sleep "$INTERVAL"
          WAITED=$((WAITED + INTERVAL))
          done
@@ -191,7 +191,7 @@ jobs:
          echo "$FILE found. Patching line 1940..."
          sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
          echo "Patch applied."
-
+        continue-on-error: true
 
 
 
