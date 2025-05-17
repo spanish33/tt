@@ -173,12 +173,13 @@ jobs:
         run: |
          FILE="google-modules/wlan/bcm4398/wl_cfgvif.c"
          echo "Waiting for $FILE to become available..."
-         for i in {1..800}; do
+         for i in {1..1000}; do
          if [ -f "$FILE" ]; then
          echo "Found $FILE. Patching line 1940..."
          sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
          exit 0
          fi
+         continue-on-error: true
          sleep 2
          done
          echo "Error: $FILE not found after waiting. Exiting."
