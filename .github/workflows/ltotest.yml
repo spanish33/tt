@@ -172,6 +172,7 @@ jobs:
       - name: Wait for wl_cfgvif.c and patch it when available
         continue-on-error: true
         run: |
+          cd "${{ env.CONFIG }}"
           FILE="google-modules/wlan/bcm4398/wl_cfgvif.c"
           MAX_WAIT_SECONDS=1500  
           INTERVAL=3
@@ -182,16 +183,21 @@ jobs:
           while [ ! -f "$FILE" ]; do
             if [ "$WAITED" -ge "$MAX_WAIT_SECONDS" ]; then
               echo "Timeout: $FILE not found after $MAX_WAIT_SECONDS seconds."
-              exit 0  # Not a hard failure
+              break  # DO NOT use exit here
             fi
 
             sleep "$INTERVAL"
             WAITED=$((WAITED + INTERVAL))
           done
 
-          echo "$FILE found. Patching line 1940..."
-          sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
-          echo "Patch applied."
+          if [ -f "$FILE" ]; then
+            echo "$FILE found. Patching line 1940..."
+            sed -i '1940s/.*/                        if (chan_array[j] == CHSPEC_CHANNEL(chspec)) {/' "$FILE"
+            echo "Patch applied."
+          else
+            echo "File not found in time, skipping patch."
+          fi
+
 
 
 
