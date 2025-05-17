@@ -201,21 +201,6 @@ jobs:
         run: |
          cd "${{ env.CONFIG }}"
 
-         # Delete broken macro definitions
-         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
-         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses_impl/d' {} +
-
-         # Rename function definition and calls
-         find . -type f -name 'gcip-mailbox.c' -exec sed -i \
-         's/static void gcip_mailbox_do_consume_responses.*/static void gcip_mailbox_consume_responses_fixed(struct gcip_mailbox *mailbox, bool trylock)/' {} +
-
-         find . -type f -name '*.c' -exec sed -i \
-         's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_consume_responses_fixed/g' {} +
-
-         find . -type f -name '*.c' -exec sed -i \
-         's/\bgcip_mailbox_do_consume_responses_impl\b/gcip_mailbox_consume_responses_fixed/g' {} +
-
-
 
       - name: Suppress unused warning for chip_rev
         run: |
@@ -228,6 +213,30 @@ jobs:
           cd "${{ env.CONFIG }}"
           sed -i '/uint32 total_md_len = 0;/a\        (void)total_md_len;' google-modules/wlan/bcm4398/dhd_msgbuf.c
 
+
+      - name: Fix corrupted GCIP macro definitions and patch function
+        run: |
+         cd "${{ env.CONFIG }}"
+
+         echo "🔍 Removing corrupted macro definitions..."
+         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses/d' {} +
+         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_do_consume_responses_impl/d' {} +
+         find . -name ".gcip_defs.h" -exec sed -i '/#define gcip_mailbox_consume_responses_fixed/d' {} +
+
+         echo "🔁 Renaming function and calls to a unique name: gcip_mailbox_response_handler_safe"
+         find . -type f -name 'gcip-mailbox.c' -exec sed -i \
+         's/static void gcip_mailbox_.*responses.*/static void gcip_mailbox_response_handler_safe(struct gcip_mailbox *mailbox, bool trylock)/' {} +
+
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_do_consume_responses\b/gcip_mailbox_response_handler_safe/g' {} +
+
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_do_consume_responses_impl\b/gcip_mailbox_response_handler_safe/g' {} +
+
+         find . -type f -name '*.c' -exec sed -i \
+         's/\bgcip_mailbox_consume_responses_fixed\b/gcip_mailbox_response_handler_safe/g' {} +
+
+         echo "✅ Patch complete. Continuing build..."
 
 
 
